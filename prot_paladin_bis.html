@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prot Paladin TBC BiS — Threat vs Mitigation</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0f1117; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 28px 32px; min-height: 100vh; }
+h1 { font-size: 22px; font-weight: 400; color: #f1f5f9; letter-spacing: 0.5px; }
+.sub { font-size: 11px; color: #475569; margin-top: 4px; letter-spacing: 1px; text-transform: uppercase; }
+.controls { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 10px; align-items: center; }
+.slot-btn { font-size: 11px; padding: 3px 9px; border-radius: 4px; cursor: pointer; border: 1px solid #334155; background: #1e293b; color: #94a3b8; transition: all 0.12s; }
+.slot-btn:hover { border-color: #475569; }
+.slot-btn.off { background: transparent; color: #334155; border-color: #1e293b; }
+.feat-btns { margin-left: auto; display: flex; gap: 6px; }
+.feat-btn { font-size: 11px; padding: 3px 11px; border-radius: 4px; cursor: pointer; border: 1px solid #1e293b; background: transparent; color: #334155; transition: all 0.12s; }
+.feat-btn.on { border-color: #378ADD; color: #378ADD; background: rgba(55,138,221,0.1); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 12px; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #94a3b8; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+#chart-wrap { position: relative; }
+#sc { display: block; width: 100%; max-width: 900px; overflow: visible; }
+circle { transition: r 0.1s; cursor: pointer; }
+.tip {
+  position: absolute; pointer-events: none;
+  background: #0f172a; border: 1px solid #334155;
+  border-radius: 8px; padding: 10px 14px; width: 220px;
+  font-size: 12px; z-index: 10; display: none;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+}
+.tip.pinned { pointer-events: auto; display: block !important; }
+.tip-phase { font-size: 10px; margin-bottom: 3px; letter-spacing: 0.5px; }
+.tip-name { font-size: 13px; font-weight: 500; color: #f1f5f9; margin-bottom: 8px; line-height: 1.3; }
+.tip-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; font-size: 11px; }
+.tip-label { color: #64748b; }
+.tip-val-t { color: #60a5fa; text-align: right; font-weight: 500; }
+.tip-val-m { color: #34d399; text-align: right; font-weight: 500; }
+.tip-link { display: block; margin-top: 8px; font-size: 10px; color: #f59e0b; text-decoration: none; letter-spacing: 0.5px; }
+.tip-link:hover { text-decoration: underline; }
+.tip-hint { font-size: 9px; color: #334155; margin-top: 6px; }
+.footer { font-size: 11px; color: #334155; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<p class="sub">TBC Classic · Protection Paladin</p>
+<h1>BiS Gear — Threat vs Mitigation</h1>
+<p style="font-size:12px;color:#475569;margin-top:4px;">sixtyupgrades.com stat weights · hover to inspect · click to pin + open Wowhead</p>
+
+<div class="controls">
+  <div id="slot-btns"></div>
+  <div class="feat-btns">
+    <button class="feat-btn on" id="btn-pareto">Pareto</button>
+    <button class="feat-btn" id="btn-labels">Labels</button>
+  </div>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<div id="chart-wrap">
+  <svg id="sc"></svg>
+  <div class="tip" id="tip"></div>
+</div>
+
+<div class="footer" id="footer"></div>
+
+<script>
+const DATA = [
+  ["Faceguard of Determination","Pre-Raid","Head",154.7,252.1,"https://www.wowhead.com/tbc/item=32083"],
+  ["Gladiator's Lamellar Helm","Pre-Raid","Head",170.3,148.6,"https://www.wowhead.com/tbc/item=31996"],
+  ["Devilshark Cape","Pre-Raid","Back",37.4,72.0,"https://www.wowhead.com/tbc/item=27804"],
+  ["Bracers of Dignity","Pre-Raid","Wrist",97.2,95.7,"https://www.wowhead.com/tbc/item=29252"],
+  ["Vambraces of Courage","Pre-Raid","Wrist",81.8,97.0,"https://www.wowhead.com/tbc/item=28502"],
+  ["Iron Gauntlets of the Maiden","Pre-Raid","Hands",124.5,173.1,"https://www.wowhead.com/tbc/item=28518"],
+  ["Girdle of Valorous Deeds","Pre-Raid","Waist",126.5,157.3,"https://www.wowhead.com/tbc/item=29253"],
+  ["Boots of the Righteous Path","Pre-Raid","Feet",134.2,123.8,"https://www.wowhead.com/tbc/item=29254"],
+  ["Pendant of Dominance","Pre-Raid","Neck",85.3,60.2,"https://www.wowhead.com/tbc/item=28245"],
+  ["Ashyen's Gift","Pre-Raid","Ring",66.6,39.0,"https://www.wowhead.com/tbc/item=29172"],
+  ["Seal of the Exorcist","Pre-Raid","Ring",68.6,39.2,"https://www.wowhead.com/tbc/item=28555"],
+  ["Andormu's Tear","Pre-Raid","Ring",19.6,79.2,"https://www.wowhead.com/tbc/item=29323"],
+  ["Gladiator's Gavel","Pre-Raid","Weapon",330.6,98.7,"https://www.wowhead.com/tbc/item=32450"],
+  ["Gavel of Unearthed Secrets","Pre-Raid","Weapon",264.1,73.3,"https://www.wowhead.com/tbc/item=30832"],
+  ["Justicar Faceguard","Phase 1","Head",193.3,209.4,"https://www.wowhead.com/tbc/item=29068"],
+  ["Crystalforge Faceguard","Phase 2","Head",224.0,245.4,"https://www.wowhead.com/tbc/item=30125"],
+  ["Tankatronic Goggles","Phase 2","Head",180.4,236.4,"https://www.wowhead.com/tbc/item=32473"],
+  ["Justicar Shoulderguards","Phase 1","Shoulder",173.9,190.3,"https://www.wowhead.com/tbc/item=29070"],
+  ["Gilded Thorium Cloak","Phase 1","Back",57.4,81.7,"https://www.wowhead.com/tbc/item=28660"],
+  ["Ruby Drape of the Mysticant","Phase 1","Back",76.1,40.1,"https://www.wowhead.com/tbc/item=28766"],
+  ["Justicar Chestguard","Phase 1","Chest",225.3,260.1,"https://www.wowhead.com/tbc/item=29066"],
+  ["Panzar'Thar Breastplate","Phase 1","Chest",183.5,255.6,"https://www.wowhead.com/tbc/item=28597"],
+  ["Crystalforge Chestguard","Phase 2","Chest",234.6,224.5,"https://www.wowhead.com/tbc/item=30123"],
+  ["Wristguards of Determination","Phase 2","Wrist",93.4,157.7,"https://www.wowhead.com/tbc/item=32515"],
+  ["Justicar Handguards","Phase 1","Hands",131.9,122.8,"https://www.wowhead.com/tbc/item=29067"],
+  ["Crimson Girdle of the Indomitable","Phase 1","Waist",121.9,184.4,"https://www.wowhead.com/tbc/item=28566"],
+  ["Girdle of the Invulnerable","Phase 2","Waist",118.6,156.0,"https://www.wowhead.com/tbc/item=30096"],
+  ["Belt of the Guardian","Phase 2","Waist",156.5,150.4,"https://www.wowhead.com/tbc/item=30034"],
+  ["Wrynn Dynasty Greaves","Phase 1","Legs",164.7,215.2,"https://www.wowhead.com/tbc/item=28621"],
+  ["Justicar Legguards","Phase 1","Legs",179.7,167.9,"https://www.wowhead.com/tbc/item=29069"],
+  ["Crystalforge Legguards","Phase 2","Legs",230.8,264.7,"https://www.wowhead.com/tbc/item=30126"],
+  ["Boots of Elusion","Phase 1","Feet",101.6,155.2,"https://www.wowhead.com/tbc/item=30641"],
+  ["Battlescar Boots","Phase 1","Feet",110.1,133.3,"https://www.wowhead.com/tbc/item=28747"],
+  ["Boots of the Resilient","Phase 2","Feet",154.5,227.5,"https://www.wowhead.com/tbc/item=32267"],
+  ["Boots of the Protector","Phase 2","Feet",165.5,191.8,"https://www.wowhead.com/tbc/item=30033"],
+  ["Barbed Choker of Discipline","Phase 1","Neck",49.9,82.9,"https://www.wowhead.com/tbc/item=28516"],
+  ["Brooch of Unquenchable Fury","Phase 1","Neck",66.6,35.4,"https://www.wowhead.com/tbc/item=28530"],
+  ["The Darkener's Grasp","Phase 2","Neck",64.0,136.4,"https://www.wowhead.com/tbc/item=30007"],
+  ["Elementium Band of the Sentry","Phase 1","Ring",35.7,71.1,"https://www.wowhead.com/tbc/item=28407"],
+  ["Violet Signet of the Great Protector","Phase 1","Ring",63.1,82.2,"https://www.wowhead.com/tbc/item=29279"],
+  ["Ring of Sundered Souls","Phase 2","Ring",57.6,95.8,"https://www.wowhead.com/tbc/item=30083"],
+  ["Seventh Ring of the Tirisfalen","Phase 2","Ring",57.9,120.9,"https://www.wowhead.com/tbc/item=30028"],
+  ["The Seal of Danzalar","Phase 2","Ring",88.0,66.0,"https://www.wowhead.com/tbc/item=33054"],
+  ["Bloodmaw Magus-Blade","Phase 1","Weapon",322.0,78.4,"https://www.wowhead.com/tbc/item=28802"],
+  ["Merciless Gladiator's Gavel","Phase 2","Weapon",370.1,107.0,"https://www.wowhead.com/tbc/item=32963"],
+  ["Fang of the Leviathan","Phase 2","Weapon",361.5,96.3,"https://www.wowhead.com/tbc/item=30095"],
+  ["Faceplate of the Impenetrable","Phase 3","Head",226.9,343.0,"https://www.wowhead.com/tbc/item=32521"],
+  ["Lightbringer Faceguard","Phase 3","Head",257.5,263.8,"https://www.wowhead.com/tbc/item=30987"],
+  ["Lightbringer Shoulderguards","Phase 3","Shoulder",199.8,211.1,"https://www.wowhead.com/tbc/item=30998"],
+  ["Pepe's Shroud of Pacification","Phase 3","Back",58.7,82.7,"https://www.wowhead.com/tbc/item=34010"],
+  ["Phoenix-Wing Cloak","Phase 2","Back",56.9,100.7,"https://www.wowhead.com/tbc/item=29925"],
+  ["Royal Cloak of the Sunstriders","Phase 2","Back",101.0,48.2,"https://www.wowhead.com/tbc/item=29992"],
+  ["Lightbringer Chestguard","Phase 3","Chest",282.0,310.4,"https://www.wowhead.com/tbc/item=30991"],
+  ["The Seeker's Wristguards","Phase 3","Wrist",139.4,187.7,"https://www.wowhead.com/tbc/item=32279"],
+  ["Eternium Shell Bracers","Phase 3","Wrist",105.5,150.6,"https://www.wowhead.com/tbc/item=32232"],
+  ["Lightbringer Handguards","Phase 3","Hands",182.8,189.9,"https://www.wowhead.com/tbc/item=30985"],
+  ["Royal Gauntlets of Silvermoon","Phase 2","Hands",151.5,201.3,"https://www.wowhead.com/tbc/item=29998"],
+  ["Crystalforge Handguards","Phase 2","Hands",160.7,195.2,"https://www.wowhead.com/tbc/item=30124"],
+  ["Girdle of Mighty Resolve","Phase 3","Waist",199.2,237.2,"https://www.wowhead.com/tbc/item=32342"],
+  ["Lightbringer Legguards","Phase 3","Legs",255.2,266.9,"https://www.wowhead.com/tbc/item=30995"],
+  ["Praetorian's Legguards","Phase 3","Legs",197.3,225.3,"https://www.wowhead.com/tbc/item=32263"],
+  ["Tide-stomper's Greaves","Phase 3","Feet",199.7,206.0,"https://www.wowhead.com/tbc/item=32245"],
+  ["Pendant of Titans","Phase 3","Neck",56.6,97.8,"https://www.wowhead.com/tbc/item=32362"],
+  ["Band of the Abyssal Lord","Phase 3","Ring",62.2,89.5,"https://www.wowhead.com/tbc/item=32261"],
+  ["Tempest of Chaos","Phase 3","Weapon",422.4,111.6,"https://www.wowhead.com/tbc/item=30910"],
+  ["Vengeful Gladiator's Gavel","Phase 3","Weapon",406.5,117.0,"https://www.wowhead.com/tbc/item=33687"],
+  ["Battleworn Tuskguard","Phase 4","Head",183.3,242.1,"https://www.wowhead.com/tbc/item=33421"],
+  ["Pauldrons of Stone Resolve","Phase 4","Shoulder",151.7,225.4,"https://www.wowhead.com/tbc/item=33481"],
+  ["Slikk's Cloak of Placation","Phase 4","Back",66.2,102.4,"https://www.wowhead.com/tbc/item=33593"],
+  ["Chestguard of the Warlord","Phase 4","Chest",199.0,258.2,"https://www.wowhead.com/tbc/item=33473"],
+  ["Chestguard of the Stoic Guardian","Phase 4","Chest",246.2,256.8,"https://www.wowhead.com/tbc/item=33522"],
+  ["Bracers of the Ancient Phalanx","Phase 4","Wrist",96.4,49.5,"https://www.wowhead.com/tbc/item=34436"],
+  ["Bonefist Gauntlets","Phase 4","Hands",125.2,125.2,"https://www.wowhead.com/tbc/item=33517"],
+  ["Girdle of the Protector","Phase 4","Waist",156.3,161.4,"https://www.wowhead.com/tbc/item=33524"],
+  ["Unwavering Legguards","Phase 4","Legs",205.7,285.2,"https://www.wowhead.com/tbc/item=33515"],
+  ["Sabatons of the Righteous Defender","Phase 4","Feet",166.7,157.2,"https://www.wowhead.com/tbc/item=33523"],
+  ["Jungle Stompers","Phase 4","Feet",134.7,208.4,"https://www.wowhead.com/tbc/item=33191"],
+  ["Amani Punisher","Phase 4","Weapon",359.6,99.2,"https://www.wowhead.com/tbc/item=33283"],
+  ["Helm of Uther's Resolve","Phase 5","Head",283.6,301.9,"https://www.wowhead.com/tbc/item=34401"],
+  ["Crown of Dath'Remar","Phase 5","Head",226.2,300.9,"https://www.wowhead.com/tbc/item=34400"],
+  ["Spaulders of the Thalassian Defender","Phase 5","Shoulder",225.4,208.3,"https://www.wowhead.com/tbc/item=34389"],
+  ["Pauldrons of Perseverance","Phase 5","Shoulder",187.7,276.1,"https://www.wowhead.com/tbc/item=34192"],
+  ["Crimson Paragon's Cover","Phase 5","Back",80.3,102.7,"https://www.wowhead.com/tbc/item=34190"],
+  ["Heroic Judicator's Chestguard","Phase 5","Chest",326.6,319.1,"https://www.wowhead.com/tbc/item=34216"],
+  ["Shattrath Protectorate's Breastplate","Phase 5","Chest",280.5,234.8,"https://www.wowhead.com/tbc/item=34945"],
+  ["Lightbringer Wristguards","Phase 5","Wrist",162.5,199.0,"https://www.wowhead.com/tbc/item=34433"],
+  ["Borderland Fortress Grips","Phase 5","Hands",167.7,218.7,"https://www.wowhead.com/tbc/item=34352"],
+  ["Lightbringer Waistguard","Phase 5","Waist",209.5,260.4,"https://www.wowhead.com/tbc/item=34488"],
+  ["Judicator's Legguards","Phase 5","Legs",295.9,307.1,"https://www.wowhead.com/tbc/item=34382"],
+  ["Lightbringer Stompers","Phase 5","Feet",184.7,205.6,"https://www.wowhead.com/tbc/item=34560"],
+  ["Blue's Greaves of the Righteous Guardian","Phase 5","Feet",193.4,227.1,"https://www.wowhead.com/tbc/item=34947"],
+  ["Collar of the Pit Lord","Phase 5","Neck",77.3,102.5,"https://www.wowhead.com/tbc/item=34178"],
+  ["Ring of Hardened Resolve","Phase 5","Ring",78.7,111.0,"https://www.wowhead.com/tbc/item=34213"],
+  ["Ring of the Stalwart Protector","Phase 5","Ring",71.9,94.3,"https://www.wowhead.com/tbc/item=34888"],
+  ["Fused Nethergon Band","Phase 5","Ring",84.2,42.2,"https://www.wowhead.com/tbc/item=34889"],
+  ["Brutal Gladiator's Gavel","Phase 5","Weapon",438.3,126.0,"https://www.wowhead.com/tbc/item=35014"],
+  ["Reign of Misery","Phase 5","Weapon",425.5,106.3,"https://www.wowhead.com/tbc/item=34176"],
+];
+
+const PHASES = ["Pre-Raid","Phase 1","Phase 2","Phase 3","Phase 4","Phase 5"];
+const PCOL = {"Pre-Raid":"#888780","Phase 1":"#378ADD","Phase 2":"#1D9E75","Phase 3":"#BA7517","Phase 4":"#D85A30","Phase 5":"#7F77DD"};
+const SLOTS = [...new Set(DATA.map(d=>d[2]))].sort();
+
+let activeSlots = new Set(SLOTS);
+let showPareto = true;
+let showLabels = false;
+let pinned = null;
+
+const svg = document.getElementById('sc');
+const tip = document.getElementById('tip');
+const NS = 'http://www.w3.org/2000/svg';
+
+const PAD = {t:32,r:32,b:54,l:60};
+const VW = 860, VH = 500;
+const PW = VW-PAD.l-PAD.r, PH = VH-PAD.t-PAD.b;
+svg.setAttribute('viewBox',`0 0 ${VW} ${VH}`);
+
+function el(tag,attrs,parent){
+  const e=document.createElementNS(NS,tag);
+  for(const[k,v] of Object.entries(attrs||{})) e.setAttribute(k,v);
+  parent&&parent.appendChild(e);
+  return e;
+}
+function txt(content,attrs,parent){
+  const e=el('text',attrs,parent);
+  e.textContent=content; return e;
+}
+
+function pareto(pts){
+  const s=[...pts].sort((a,b)=>b[0]-a[0]);
+  const f=[];let mxM=-Infinity;
+  for(const p of s){if(p[1]>mxM){f.push(p);mxM=p[1];}}
+  return f;
+}
+
+let scX,scY;
+
+function render(){
+  while(svg.firstChild)svg.removeChild(svg.firstChild);
+  tip.style.display='none'; tip.className='tip';
+
+  const pts=DATA.filter(d=>activeSlots.has(d[2]));
+  if(!pts.length){txt('No items selected',{x:VW/2,y:VH/2,'text-anchor':'middle',fill:'#475569',fontSize:14},svg);return;}
+
+  const ts=pts.map(d=>d[3]),ms=pts.map(d=>d[4]);
+  const minT=Math.min(...ts),maxT=Math.max(...ts),minM=Math.min(...ms),maxM=Math.max(...ms);
+  const pt=(maxT-minT)*0.08,pm=(maxM-minM)*0.08;
+  const t0=minT-pt,t1=maxT+pt,m0=minM-pm,m1=maxM+pm;
+  scX=v=>PAD.l+((v-t0)/(t1-t0))*PW;
+  scY=v=>PAD.t+PH-((v-m0)/(m1-m0))*PH;
+
+  const g=el('g',{},svg);
+  for(let i=0;i<=6;i++){
+    const v=t0+(t1-t0)*i/6,x=scX(v);
+    el('line',{x1:x,y1:PAD.t,x2:x,y2:PAD.t+PH,stroke:'#1e293b','stroke-width':.5},g);
+    txt(Math.round(v),{x,y:PAD.t+PH+16,'text-anchor':'middle',fontSize:10,fill:'#475569'},g);
+  }
+  for(let i=0;i<=5;i++){
+    const v=m0+(m1-m0)*i/5,y=scY(v);
+    el('line',{x1:PAD.l,y1:y,x2:PAD.l+PW,y2:y,stroke:'#1e293b','stroke-width':.5},g);
+    txt(Math.round(v),{x:PAD.l-8,y:y+4,'text-anchor':'end',fontSize:10,fill:'#475569'},g);
+  }
+  txt('Threat score →',{x:PAD.l+PW/2,y:PAD.t+PH+40,'text-anchor':'middle',fontSize:11,fill:'#475569','letter-spacing':1},svg);
+  const yl=el('text',{transform:`translate(15,${PAD.t+PH/2}) rotate(-90)`,'text-anchor':'middle',fontSize:11,fill:'#475569','letter-spacing':1},svg);
+  yl.textContent='Mitigation score →';
+
+  if(showPareto&&pts.length>1){
+    const fp=pareto(pts.map(d=>[d[3],d[4]])).sort((a,b)=>a[0]-b[0]);
+    if(fp.length>1){
+      const d=fp.map((p,i)=>`${i?'L':'M'}${scX(p[0]).toFixed(1)},${scY(p[1]).toFixed(1)}`).join('');
+      el('path',{d,fill:'none',stroke:'#BA7517','stroke-width':1.5,'stroke-dasharray':'6,3',opacity:.7},svg);
+    }
+  }
+
+  const clip=el('clipPath',{id:'clip'},svg);
+  el('rect',{x:PAD.l,y:PAD.t,width:PW,height:PH},clip);
+  const cg=el('g',{'clip-path':'url(#clip)'},svg);
+
+  pts.forEach(d=>{
+    const cx=scX(d[3]),cy=scY(d[4]);
+    const pg=el('g',{},cg);
+    const c=el('circle',{cx,cy,r:5.5,fill:PCOL[d[1]],opacity:.83},pg);
+    c.addEventListener('mouseenter',()=>{if(!pinned)showTip(d,cx,cy,false);c.setAttribute('r',8);c.setAttribute('opacity',1);});
+    c.addEventListener('mouseleave',()=>{if(!pinned){tip.style.display='none';}c.setAttribute('r',5.5);c.setAttribute('opacity',.83);});
+    c.addEventListener('click',e=>{
+      e.stopPropagation();
+      if(pinned===d){pinned=null;tip.style.display='none';}
+      else{pinned=d;showTip(d,cx,cy,true);}
+    });
+    if(showLabels){
+      txt(d[0].split(' ').slice(0,2).join(' '),{x:cx+7,y:cy+4,fontSize:9,fill:'#64748b','pointer-events':'none'},pg);
+    }
+  });
+
+  svg.addEventListener('click',()=>{pinned=null;tip.style.display='none';});
+  document.getElementById('footer').textContent=`${pts.length} items shown`;
+}
+
+function showTip(d,cx,cy,isPinned){
+  tip.innerHTML=`
+    <div class="tip-phase" style="color:${PCOL[d[1]]}">${d[1]} · ${d[2]}</div>
+    <div class="tip-name">${d[0]}</div>
+    <div class="tip-grid">
+      <span class="tip-label">Threat</span><span class="tip-val-t">${d[3]}</span>
+      <span class="tip-label">Mitigation</span><span class="tip-val-m">${d[4]}</span>
+    </div>
+    ${isPinned?`<a class="tip-link" href="${d[5]}" target="_blank" rel="noreferrer">View on Wowhead →</a>`:'<div class="tip-hint">click to pin</div>'}
+  `;
+  const svgRect=svg.getBoundingClientRect();
+  const tipW=220;
+  const rawX=cx/VW*svgRect.width;
+  const rawY=cy/VH*svgRect.height;
+  const left=(rawX+14+tipW>svgRect.width)?rawX-tipW-14:rawX+14;
+  const top=Math.max(0,rawY-60);
+  tip.style.left=left+'px';
+  tip.style.top=top+'px';
+  tip.style.display='block';
+  tip.className=isPinned?'tip pinned':'tip';
+}
+
+function buildControls(){
+  const c=document.getElementById('slot-btns');
+  c.style.cssText='display:flex;flex-wrap:wrap;gap:4px;';
+  SLOTS.forEach(s=>{
+    const b=document.createElement('button');
+    b.textContent=s; b.className='slot-btn'; b.dataset.slot=s;
+    b.addEventListener('click',()=>{
+      if(activeSlots.has(s)){activeSlots.delete(s);b.className='slot-btn off';}
+      else{activeSlots.add(s);b.className='slot-btn';}
+      pinned=null; render();
+    });
+    c.appendChild(b);
+  });
+  const leg=document.getElementById('legend');
+  PHASES.forEach(p=>{
+    const d=document.createElement('div');
+    d.className='legend-item';
+    d.innerHTML=`<span class="legend-dot" style="background:${PCOL[p]}"></span>${p}`;
+    leg.appendChild(d);
+  });
+}
+
+document.getElementById('btn-pareto').addEventListener('click',function(){
+  showPareto=!showPareto;this.className=showPareto?'feat-btn on':'feat-btn';render();
+});
+document.getElementById('btn-labels').addEventListener('click',function(){
+  showLabels=!showLabels;this.className=showLabels?'feat-btn on':'feat-btn';render();
+});
+
+buildControls();
+render();
+</script>
+</body>
+</html>
