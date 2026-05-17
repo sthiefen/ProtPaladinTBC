@@ -51,8 +51,6 @@ circle { transition: r 0.1s; cursor: pointer; }
 <div class="controls">
   <div id="slot-btns"></div>
   <div class="feat-btns">
-    <button class="feat-btn on" id="btn-pareto">Pareto</button>
-    <button class="feat-btn" id="btn-labels">Labels</button>
   </div>
 </div>
 
@@ -171,7 +169,7 @@ const PCOL = {"Pre-Raid":"#888780","Phase 1":"#378ADD","Phase 2":"#1D9E75","Phas
 const SLOTS = [...new Set(DATA.map(d=>d[2]))].sort();
 
 let activeSlots = new Set(SLOTS);
-let showPareto = true;
+let showPareto = false;
 let showLabels = false;
 let pinned = null;
 
@@ -256,9 +254,6 @@ function render(){
       if(pinned===d){pinned=null;tip.style.display='none';}
       else{pinned=d;showTip(d,cx,cy,true);}
     });
-    if(showLabels){
-      txt(d[0].split(' ').slice(0,2).join(' '),{x:cx+7,y:cy+4,fontSize:9,fill:'#64748b','pointer-events':'none'},pg);
-    }
   });
 
   svg.addEventListener('click',()=>{pinned=null;tip.style.display='none';});
@@ -308,13 +303,6 @@ function buildControls(){
     leg.appendChild(d);
   });
 }
-
-document.getElementById('btn-pareto').addEventListener('click',function(){
-  showPareto=!showPareto;this.className=showPareto?'feat-btn on':'feat-btn';render();
-});
-document.getElementById('btn-labels').addEventListener('click',function(){
-  showLabels=!showLabels;this.className=showLabels?'feat-btn on':'feat-btn';render();
-});
 
 buildControls();
 render();
